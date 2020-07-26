@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
-setup(name='singt',
-      version='0.3.7',
-      packages=["singt"],
+setup(name='singtcommon',
+      version='0.4',
+      packages=["singtcommon"],
       include_package_data=True
 )
