@@ -61,6 +61,6 @@ class EventSource(resource.Resource):
                           
 
     def add_initialiser(self, f):
-        """ Initialisers must return Deferreds whose callbacks return a tuple (event string, data). """
+        """ Initialisers must return Deferreds whose callbacks return a tuple (event string, data string). """
         self._initialisers.append(f)
         

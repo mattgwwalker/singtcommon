@@ -20,7 +20,7 @@ class TCPPacketizer:
         msg_as_bytes = msg.encode("utf-8")
         len_as_short = struct.pack("H", len(msg))
         encoded_msg = len_as_short + msg_as_bytes
-        self._transport.write(encoded_msg)
+        return self._transport.write(encoded_msg)
 
         
     def decode(self, data):
