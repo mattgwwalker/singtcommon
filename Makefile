@@ -4,3 +4,5 @@ wheel:
 clean:
 	rm -rf dist
 
+cloc:
+	cloc singtcommon
