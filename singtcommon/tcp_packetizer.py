@@ -18,12 +18,25 @@ class TCPPacketizer:
     def write(self, msg):
         """Writes a string over TCP."""
         msg_as_bytes = msg.encode("utf-8")
-        len_as_short = struct.pack("H", len(msg))
-        encoded_msg = len_as_short + msg_as_bytes
-        return self._transport.write(encoded_msg)
+        return self.write_bytes(msg_as_bytes)
 
+    
+    def write_bytes(self, msg_bytes):
+        """Writes bytes over TCP."""
+        len_as_short = struct.pack("H", len(msg_bytes))
+        encoded_msg = len_as_short + msg_bytes
+        return self._transport.write(encoded_msg)
+    
         
     def decode(self, data):
+        """Decodes packets as strings."""
+        packets = self.decode_bytes(data)
+        packets_as_str = [packet.decode("utf-8") for packet in packets]
+        return packets_as_str
+
+    
+    def decode_bytes(self, data):
+        """Decodes packet as bytes."""
         #print("Received data:", data)
 
         # Combine current data with buffer
@@ -51,7 +64,7 @@ class TCPPacketizer:
                     msg = data[:self._length]
 
                     # Process the message
-                    packets.append(msg.decode("utf-8"))
+                    packets.append(msg)
 
                     # Remove the current message from any remaining data
                     data = data[self._length:]
