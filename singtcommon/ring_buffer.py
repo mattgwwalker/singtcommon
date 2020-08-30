@@ -10,7 +10,8 @@ class RingBuffer:
         # Check we have matching dtypes
         if self._buffer.dtype != array.dtype:
             raise Exception(
-                "Buffer type and array type do not match"
+                f"Buffer type ({self._buffer.dtype}) and "+
+                f"array type ({array.dtype}) do not match"
             )
         
         # Calculate space remaining
@@ -19,24 +20,18 @@ class RingBuffer:
                 len(self._buffer)
                 - (self._producer_index - self._consumer_index)
             )
-            print("space remaining (A):", space_remaining)
         else:
-            consumed = (
-                len(self._buffer) - self._consumer
-                + self._producer_index - 1
-            )
-            print("consumed:", consumed)
             space_remaining = (
-                len(self._buffer)
-                - consumed
+                self._consumer_index
+                - self._producer_index
+                - 1
             )
-            print("space remaining (B):", space_remaining)
             
         # Check that array is not too big for the buffer
         if len(array) > space_remaining:
             raise Exception(
-                f"Buffer overrun: Length of array too great "+
-                f"for space remaining in buffer "+
+                f"Buffer overrun: Length of array ({len(array)}) "+
+                f"too great for space remaining in buffer "+
                 f"({space_remaining})"
             )
         

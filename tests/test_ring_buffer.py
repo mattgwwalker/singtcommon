@@ -161,3 +161,66 @@ def test_put_incorrect_type():
     with pytest.raises(Exception):
         ring_buffer.put(array)
     
+def test_stress_test():
+    import random
+    random.seed(1234)
+
+    # Create RingBuffer
+    shape = (250,2)
+    ring_buffer = RingBuffer(shape, dtype=numpy.int32)
+
+    producer_value = None
+    def start_producer():
+        # Fill buffer half-way
+        data = list(range(shape[0]))
+        array = numpy.array(
+            data,
+            dtype=numpy.int32
+        ).reshape(
+            (shape[0]//shape[1],
+             shape[1])
+        )
+        ring_buffer.put(array)
+        return data[-1]+1
+    
+    def produce(producer_value):
+        # Choose randomly how many items to add
+        num_items = random.randint(1,10)
+        # Add the items
+        data = list(range(
+            producer_value,
+            producer_value+(num_items*shape[1])
+        ))
+        array = numpy.array(data, dtype=numpy.int32).reshape(
+            (num_items,shape[1])
+        )
+        ring_buffer.put(array)
+        print("Added:\n", array)
+        return data[-1]+1
+
+    consumer_value = 0
+    def consume(consumer_value):
+        # Choose randomly how many items to remove
+        num_items = random.randint(1,10)
+        # Remove the items
+        array = numpy.zeros(
+            (num_items, shape[1]),
+            dtype=numpy.int32
+        )
+        ring_buffer.get(array)
+        print("Consumed:\n", array)
+        # Check their values
+        data = list(range(
+            consumer_value,
+            consumer_value+(num_items*shape[1])
+        ))
+        expected_array = numpy.array(data).reshape(
+            (num_items,shape[1])
+        )
+        assert numpy.all(array == expected_array)
+        return data[-1]+1
+    
+    producer_value = start_producer()
+    for _ in range(1000):
+        producer_value = produce(producer_value)
+        consumer_value = consume(consumer_value)
