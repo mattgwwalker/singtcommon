@@ -7,8 +7,6 @@ def test_create_ring_buffer():
     shape = (1000,2)
     ring_buffer = RingBuffer(shape)
 
-    assert ring_buffer
-
 def test_store_and_retrieve_1D_data():
     shape = (1000,)
     ring_buffer = RingBuffer(shape, dtype=numpy.uint8)
@@ -48,26 +46,31 @@ def test_wrap_around():
     shape = (10,1)
     ring_buffer = RingBuffer(shape, dtype=numpy.uint8)
 
-    data = b"\x01" * 8
+    length1 = 8
+    data = b"\x01" * length1
     array = numpy.frombuffer(data, dtype=numpy.uint8)
     array = array.reshape((len(data), 1))
 
     # Put data into ring buffer
     ring_buffer.put(array)
+    assert len(ring_buffer) == length1
 
     # Get data from ring buffer
     out_array = numpy.zeros(array.shape, dtype=numpy.uint8) 
     ring_buffer.get(out_array)
+    assert len(ring_buffer) == 0
 
     # Check that the input and output are the same
     assert numpy.all(array == out_array)
 
+    # Add more data, therefore crossing the end of the buffer
     data = b"\x02\x03\x04"
     array = numpy.frombuffer(data, dtype=numpy.uint8)
     array = array.reshape((len(data), 1))
 
     # Put data into ring buffer
     ring_buffer.put(array)
+    assert len(ring_buffer) == len(data)
 
     # Get data from ring buffer
     out_array = numpy.zeros(array.shape, dtype=numpy.uint8) 
@@ -76,17 +79,57 @@ def test_wrap_around():
     # Check that the input and output are the same
     assert numpy.all(array == out_array)
 
+def test_length():
+    length = 10
+    shape = (length,)
+    ring_buffer = RingBuffer(shape, dtype=numpy.uint8)
+    assert len(ring_buffer) == 0
+
+    # Add one item
+    data = b"\x01"
+    array = numpy.frombuffer(data, dtype=numpy.uint8)
+    ring_buffer.put(array)
+    assert len(ring_buffer) == 1
+        
 def test_buffer_too_small():
-    shape = (10,1)
+    length = 10
+    shape = (length,1)
     ring_buffer = RingBuffer(shape, dtype=numpy.uint8)
 
-    data = b"\x01" * 11
+    data = b"\x01" * (length+1)
     array = numpy.frombuffer(data, dtype=numpy.uint8)
     array = array.reshape((len(data), 1))
 
     # Put data into ring buffer
     with pytest.raises(Exception):
         ring_buffer.put(array)
+
+def test_buffer_just_right():
+    length = 10
+    shape = (length,)
+    ring_buffer = RingBuffer(shape, dtype=numpy.int64)
+
+    data = list(range(length))
+    array = numpy.array(data)
+
+    # Put data into ring buffer
+    ring_buffer.put(array)
+    assert len(ring_buffer) == len(array)
+
+    # Remove one item
+    out = numpy.zeros((1,))
+    ring_buffer.get(out)
+    assert out[0] == 0
+    assert len(ring_buffer) == length-1
+
+    # Add one more item
+    in_ = numpy.array([10])
+    ring_buffer.put(in_)
+    assert len(ring_buffer) == length
+
+    # Ensure we can't add even one more
+    with pytest.raises(Exception):
+        ring_buffer.put(in_)
 
 def test_buffer_overflow():
     shape = (10,1)
@@ -224,3 +267,4 @@ def test_stress_test():
     for _ in range(1000):
         producer_value = produce(producer_value)
         consumer_value = consume(consumer_value)
+

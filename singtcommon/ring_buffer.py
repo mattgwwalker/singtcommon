@@ -2,9 +2,23 @@ import numpy
 
 class RingBuffer:
     def __init__(self, shape, dtype=numpy.int16):
+        # Add an extra element in the first dimension.  This allows
+        # the ring buffer to hold the number of items specified (as
+        # the ring buffer can only hold length-1 items).
+        shape = list(shape)
+        shape[0] += 1
         self._buffer = numpy.zeros(shape, dtype=dtype)
         self._producer_index = 0
         self._consumer_index = 0
+
+    def __len__(self):
+        if self._producer_index >= self._consumer_index:
+            return self._producer_index - self._consumer_index
+        else:
+            return (
+                len(self._buffer) - self._consumer_index
+                + self._producer_index
+            )
 
     def put(self, array):
         # Check we have matching dtypes
@@ -14,18 +28,10 @@ class RingBuffer:
                 f"array type ({array.dtype}) do not match"
             )
         
-        # Calculate space remaining
-        if self._producer_index >= self._consumer_index:
-            space_remaining = (
-                len(self._buffer)
-                - (self._producer_index - self._consumer_index)
-            )
-        else:
-            space_remaining = (
-                self._consumer_index
-                - self._producer_index
-                - 1
-            )
+        # Calculate space remaining.  We subtract one from the "true"
+        # space remaining in order to allow the producer index to
+        # point to a valid item after the end of the data.
+        space_remaining = len(self._buffer) - len(self) - 1
             
         # Check that array is not too big for the buffer
         if len(array) > space_remaining:
@@ -46,6 +52,7 @@ class RingBuffer:
             
             # Update the producer index
             self._producer_index += len(array)
+            self._producer_index %= len(self._buffer)
             
         else:
             # The new data will overflow the end of the buffer and so
@@ -63,22 +70,14 @@ class RingBuffer:
                 :len(array)-remaining_buffer
             ] = array[remaining_buffer:]
 
-            # Update the producee index
+            # Update the producer index
             self._producer_index = len(array)-remaining_buffer
         
     def get(self, out):
-        # Check that there's sufficient data available
-        if self._producer_index >= self._consumer_index:
-            data_available = (
-                self._producer_index - self._consumer_index
-            )
-        else:
-            # Handle the wrap-around case
-            data_available = (
-                self._producer_index
-                + len(self._buffer) - self._consumer_index
-            )
-
+        # Get amount of data in buffer
+        data_available = len(self)
+        
+        # Check that there's sufficient data available for get request
         if len(out) > data_available:
             raise Exception(
                 f"Buffer underrun: insufficient data available "+
