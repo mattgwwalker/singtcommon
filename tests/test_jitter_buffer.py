@@ -136,49 +136,6 @@ def test_get_out_of_order_packets():
     assert out is value1
     assert len(jitter_buffer) == buffer_length
     
-def test_stress_test():
-    import random
-    random.seed(1234)
-    buffer_length = 5
-    jitter_buffer = JitterBuffer(
-        buffer_length=buffer_length
-    )
-
-    # Set the roll-over value to a lower number to test the roll-over
-    # code
-    roll_over = 30
-    jitter_buffer._seq_no_rollover = roll_over
-
-    # Put the first value of zero to set the expected sequence number
-    jitter_buffer.put_packet(0,0)
-    
-    buf = []
-    i = 1
-    j = 0
-    gots = 0
-    expected = 0
-    while True:
-        if i > 1000 and len(buf)==0:
-            break
-        if len(buf) == 0:
-            buf = list(range(i,i+5))
-            random.shuffle(buf)
-            i += 5
-        x = buf.pop()
-        print("putting", x)
-        jitter_buffer.put_packet(
-            x%roll_over,
-            x
-        )
-        out = jitter_buffer.get_packet()
-        gots += 1
-        print("got", out)
-        if gots <= buffer_length:
-            assert out is None
-        else:
-            print("expected:", expected)
-            assert out == expected
-            expected += 1
 
 def test_overly_large_seq_no():
     jitter_buffer = JitterBuffer()
@@ -190,3 +147,74 @@ def test_overly_large_seq_no():
 
     with pytest.raises(Exception):
         jitter_buffer.put_packet(roll_over, None)
+
+
+def test_stress_test2():
+    import random
+    random.seed(1234)
+    from collections import deque
+    
+    # Create jitter buffer
+    jitter_buffer = JitterBuffer()
+    
+    # Set the roll-over value
+    roll_over = 1000
+    jitter_buffer._seq_no_rollover = roll_over
+    
+    # Number of packets to simulate
+    number_of_packets = 200000
+
+    # Duration per packet at source
+    packet_duration = 20 / 1000 # seconds
+
+    # Packet values
+    packet_values = [i for i in range(number_of_packets)]
+
+    # Generate missing packets
+    prob_missing = 0.05
+    keep = int(len(packet_values) * (1-prob_missing))
+    packet_values = random.sample(packet_values, keep)
+
+    # Packet arrival times (no delay)
+    packet_times = [i*packet_duration for i in packet_values]
+
+    # Add noise in packet arrival time
+    mu = 0
+    sigma = packet_duration * 5
+    packet_times = [t + random.gauss(mu, sigma) for t in packet_times]
+    
+    # Join the values and times
+    packets = zip(packet_values, packet_times)
+
+    # Sort the packets into the correct order
+    sorted_packets = sorted(packets, key = lambda p: p[1])
+    sorted_packets = deque(sorted_packets)
+
+
+    t = 0 + packet_duration
+    while True:
+        # If the deque is empty, break
+        if len(sorted_packets) == 0:
+            break
+
+        # Put first packet into the buffer if it appears before time t
+        if sorted_packets[0][1] < t:
+            value = sorted_packets[0][0]
+            #print("putting", value)
+            jitter_buffer.put_packet(
+                value % roll_over,
+                value
+            )
+            sorted_packets.popleft()
+        else:
+            # Get the next packet
+            out = jitter_buffer.get_packet()
+            #print("got", out)
+
+            # Increment simulated time
+            t += packet_duration
+
+            # Check the length of the buffer
+            #print("length:", len(jitter_buffer),"\n")
+
+        

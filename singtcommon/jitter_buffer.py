@@ -14,7 +14,15 @@ class JitterBuffer:
             # The value at which sequence numbers roll back to zero
             self._seq_no_rollover = 2**16
 
+            # Number of missed packets in a row to trigger buffer
+            # reset
+            self._max_missed_sequential_packets = 3
+
             self._reset_buffer()
+            self._reset_stats()
+
+    def __del__(self):
+        self._print_stats()
 
     def __len__(self):
         with self._buffer_lock:
@@ -30,6 +38,11 @@ class JitterBuffer:
                     f"Unexpectedly large sequence number ({seq_no}), "+
                     f"roll-over expected at {self._seq_no_rollover}"
                 )
+
+            # Update statistics
+            self._put_packets += 1
+            if len(self) > self._max_length:
+                self._max_length = len(self)
             #print(f"jitter buffer recv'd packet number {seq_no} (buffer contains {self._get_buffer_size()} items)")
 
             self._started = True
@@ -72,6 +85,9 @@ class JitterBuffer:
     def get_packet(self):
         with self._buffer_lock:
             #print(f"getting packet from jitter buffer (which contains {self._get_buffer_size()} items)")
+            # Update statistics
+            self._got_packets += 1
+            self._total_length_at_get += len(self)
 
             if not self._started:
                 #print("We haven't received our first packet; ignoring get request")
@@ -80,16 +96,19 @@ class JitterBuffer:
             # If the buffer is empty, give up on the currently
             # expected sequence number and return None
             if len(self._buffer) == 0:
-                self._missed_packets += 1
                 print(f"jitter buffer is giving up on the expected packet number {self._expected_seq_no} (total of {self._missed_packets} packets missed)")
+                self._missed_packets += 1
+                self._missed_sequential_packets += 1
                 self._expected_seq_no += 1
                 self._expected_seq_no %= self._seq_no_rollover
                 self._check_out_of_order_packets()
-                if self._missed_packets >= 3:
+                if self._missed_sequential_packets >= self._max_missed_sequential_packets:
+                    print("Too many missed sequential packets; resetting jitter buffer")
                     self._reset_buffer()
                 return None
 
             # Otherwise, return the first item
+            self._missed_sequential_packets = 0
             packet = self._buffer.popleft()
             return packet
 
@@ -115,9 +134,24 @@ class JitterBuffer:
             for _ in range(self._buffer_length):
                 self._buffer.append(None)
 
-            self._missed_packets = 0
+            self._missed_sequential_packets = 0
 
+    def _reset_stats(self):
+        self._put_packets = 0
+        self._got_packets = 0
+        self._missed_packets = 0
+        self._max_length = 0
+        self._total_length_at_get = 0
+
+    def _print_stats(self):
+        print("JitterBuffer statistics:")
+        print("put packets:", self._put_packets)
+        print("got packets:", self._got_packets)
+        print("missed packets:", self._missed_packets)
+        print("max length:", self._max_length)
+        print("average length at get:", round(self._total_length_at_get/self._got_packets, 1))
         
+            
     def _check_out_of_order_packets(self):
         with self._buffer_lock:
             while self._expected_seq_no in self._out_of_order_packets:
