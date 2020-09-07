@@ -149,7 +149,8 @@ class JitterBuffer:
         print("got packets:", self._got_packets)
         print("missed packets:", self._missed_packets)
         print("max length:", self._max_length)
-        print("average length at get:", round(self._total_length_at_get/self._got_packets, 1))
+        if self._got_packets > 0:
+            print("average length at get:", round(self._total_length_at_get/self._got_packets, 1))
         
             
     def _check_out_of_order_packets(self):
