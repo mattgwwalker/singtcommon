@@ -41,7 +41,8 @@ class EventSource(resource.Resource):
             d = f()
             d.addCallback(on_result)
             d.addErrback(on_error)
-    
+
+            
     def remove_subscriber(self, subscriber):
         if subscriber in self.subscribers:
             #log.msg("Removing subscriber..")
@@ -61,6 +62,11 @@ class EventSource(resource.Resource):
                           
 
     def add_initialiser(self, f):
-        """ Initialisers must return Deferreds whose callbacks return a tuple (event string, data string). """
+        """Add callback to handle initialising an event source connection.
+
+        Initialisers must return Deferreds whose callbacks return a
+        tuple (event string, data string).
+
+        """
         self._initialisers.append(f)
         
